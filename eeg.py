@@ -3,6 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import sklearn.model_selection
 import sklearn.linear_model
+import sklearn.ensemble
 import sklearn.metrics
 import scipy.stats
 
@@ -29,36 +30,36 @@ del temp
 # PLOTS
 
 # for r in indivs.iterrows():
-#     indiv = r[1]['indiv']
-#     seizure = r[1]['seizure']
-#     print(indiv)
+    indiv = r[1]['indiv']
+    seizure = r[1]['seizure']
+    print(indiv)
 
     # Plots of readings in chunk 5 by individual
-    # chunk = 5
-    # plt.plot(long.loc[(indiv, chunk), :]['X'])
-    # plt.ylim(-1000, 1000)
-    # plt.savefig('images/chunk5/' + str(seizure) + indiv + '.png')
-    # plt.clf()
+    chunk = 5
+    plt.plot(long.loc[(indiv, chunk), :]['X'])
+    plt.ylim(-1000, 1000)
+    plt.savefig('images/chunk5/' + str(seizure) + indiv + '.png')
+    plt.clf()
 
     # FALSE: flat; moderate swings without periodicity; single spike
     # TRUE: large swings, moderate swings with periodicity
 
     # Plots of readings of multiple chunks for select individuals
-    # if r[0] % 10 == 0:
-    #     for chunk in (10, 11, 12, 15, 20):
-    #         plt.plot(long.loc[(indiv, chunk), :]['X'])
-    #         plt.ylim(-1000, 1000)
-    #         plt.savefig('images/mult_chunks/' + str(seizure) + indiv + '_'
-    #                     + str(chunk) + '.png')
-    #         plt.clf()
+    if r[0] % 10 == 0:
+        for chunk in (10, 11, 12, 15, 20):
+            plt.plot(long.loc[(indiv, chunk), :]['X'])
+            plt.ylim(-1000, 1000)
+            plt.savefig('images/mult_chunks/' + str(seizure) + indiv + '_'
+                        + str(chunk) + '.png')
+            plt.clf()
     
     # Patterns are similar across chunks within individuals.
 
-    # Plots of chunk averages by individual
-    # plt.plot(by_chunk.loc[indiv, :]['X'])
-    # plt.ylim(-100, 100)
-    # plt.savefig('images/by_chunk/' + str(seizure) + indiv + '.png')
-    # plt.clf()
+    Plots of chunk averages by individual
+    plt.plot(by_chunk.loc[indiv, :]['X'])
+    plt.ylim(-100, 100)
+    plt.savefig('images/by_chunk/' + str(seizure) + indiv + '.png')
+    plt.clf()
 
     # Per above, I don't think this is helpful.
 
@@ -86,23 +87,39 @@ X = pd.pivot_table(long, index=['indiv', 'chunk', 'seizure'], values='X',
 y = pd.pivot_table(long, index=['indiv', 'chunk'], values='seizure')
 
 # k-fold cross validation, grouped by individual and stratified by class
+# TODO: model tuning
 skf = sklearn.model_selection.StratifiedKFold(n_splits=5)
 lr = sklearn.linear_model.LogisticRegression()
-precision = []
-recall = []
+et = sklearn.ensemble.ExtraTreesClassifier()
+precision = [[], []]
+recall = [[], []]
+confusion = [[], []]
 for train, test in skf.split(indivs, indivs['seizure']):
     X_train = X.loc[indivs.iloc[train]['indiv']]
     X_test = X.loc[indivs.iloc[test]['indiv']]
     y_train = y.loc[indivs.iloc[train]['indiv']]
     y_test = y.loc[indivs.iloc[test]['indiv']]
     lr.fit(X_train, y_train)
-    y_pred = lr.predict(X_test)
-    precision.append(sklearn.metrics.precision_score(y_test, y_pred))
-    recall.append(sklearn.metrics.recall_score(y_test, y_pred))
-    print(sklearn.metrics.confusion_matrix(y_test, y_pred))
-print("Precision: {}".format(np.mean(precision)))
-print("Recall: {}".format(np.mean(recall)))
+    y_pred_lr = lr.predict(X_test)
+    precision[0].append(sklearn.metrics.precision_score(y_test, y_pred_lr))
+    recall[0].append(sklearn.metrics.recall_score(y_test, y_pred_lr))
+    confusion[0].append(sklearn.metrics.confusion_matrix(y_test, y_pred_lr))
+    et.fit(X_train, y_train)
+    y_pred_et = et.predict(X_test)
+    precision[1].append(sklearn.metrics.precision_score(y_test, y_pred_et))
+    recall[1].append(sklearn.metrics.recall_score(y_test, y_pred_et))
+    confusion[1].append(sklearn.metrics.confusion_matrix(y_test, y_pred_et))
+print("LogisticRegression")
+print("Precision: {}".format(np.mean(precision[0])))
+print("Recall: {}".format(np.mean(recall[0])))
+print("Confusion matrix:\n{}".format(sum(confusion[0])))
+print("ExtraTrees")
+print("Precision: {}".format(np.mean(precision[1])))
+print("Recall: {}".format(np.mean(recall[1])))
+print("Confusion matrix:\n{}".format(sum(confusion[1])))
 
-# Precision: 93.3%, Recall: 81.6%
+
+# LR Precision: 93.3%, Recall: 81.6%
+# ExtraTrees has lower precision, higher recall
 # Mean adds nothing. Either SD or range is essential, but not both.
 # Slopes add nothing.
